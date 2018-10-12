@@ -20,6 +20,7 @@ find_package(catkin REQUIRED
             tf2_geometry_msgs
             tf2_ros
             voxel_grid
+            quadruped_msgs
         )
 
 find_package(Boost REQUIRED
@@ -75,6 +76,7 @@ catkin_package(
         tf2
         tf2_ros
         voxel_grid
+        quadruped_msgs
 )
 
 #uncomment for profiling
