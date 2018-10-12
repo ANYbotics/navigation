@@ -41,7 +41,8 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/thread.hpp>
 
-#include <geometry_msgs/Twist.h>
+// #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/TwistStamped.h>
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
@@ -89,6 +90,7 @@ namespace move_base {
 
     //for commanding the base
     vel_pub_ = nh.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+    vel_stamped_pub_ = nh.advertise<geometry_msgs::TwistStamped>("cmd_vel_stamped", 1);
     current_goal_pub_ = private_nh.advertise<geometry_msgs::PoseStamped>("current_goal", 0 );
 
     ros::NodeHandle action_nh("move_base");
@@ -494,6 +496,11 @@ namespace move_base {
     cmd_vel.linear.y = 0.0;
     cmd_vel.angular.z = 0.0;
     vel_pub_.publish(cmd_vel);
+    geometry_msgs::TwistStamped cmd_vel_stamped;
+    cmd_vel_stamped.header.stamp = ros::Time::now();
+    cmd_vel_stamped.header.frame_id = "base";
+    cmd_vel_stamped.twist = cmd_vel;
+    vel_stamped_pub_.publish(cmd_vel_stamped);
   }
 
   bool MoveBase::isQuaternionValid(const geometry_msgs::Quaternion& q){
@@ -902,6 +909,11 @@ namespace move_base {
           last_valid_control_ = ros::Time::now();
           //make sure that we send the velocity command to the base
           vel_pub_.publish(cmd_vel);
+          geometry_msgs::TwistStamped cmd_vel_stamped;
+          cmd_vel_stamped.header.stamp = ros::Time::now();
+          cmd_vel_stamped.header.frame_id = "base"; // TODO: make it configurable
+          cmd_vel_stamped.twist = cmd_vel;
+          vel_stamped_pub_.publish(cmd_vel_stamped);
           if(recovery_trigger_ == CONTROLLING_R)
             recovery_index_ = 0;
         }
