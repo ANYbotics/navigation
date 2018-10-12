@@ -35,6 +35,7 @@
  * Author: TKruse
  *********************************************************************/
 #include <base_local_planner/odometry_helper_ros.h>
+#include <ros/exceptions.h>
 
 namespace base_local_planner {
 
@@ -53,6 +54,16 @@ void OdometryHelperRos::odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   base_odom_.child_frame_id = msg->child_frame_id;
 //  ROS_DEBUG_NAMED("dwa_local_planner", "In the odometry callback with velocity values: (%.2f, %.2f, %.2f)",
 //      base_odom_.twist.twist.linear.x, base_odom_.twist.twist.linear.y, base_odom_.twist.twist.angular.z);
+}
+
+void OdometryHelperRos::qStateCallback(const quadruped_msgs::QuadrupedState::ConstPtr& msg) {
+  ROS_INFO_ONCE("QuadrupedState received!");
+
+  boost::mutex::scoped_lock lock(odom_mutex_);
+  base_odom_.twist.twist.linear.x = msg->twist.twist.linear.x;
+  base_odom_.twist.twist.linear.y = msg->twist.twist.linear.y;
+  base_odom_.twist.twist.angular.z = msg->twist.twist.angular.z;
+  base_odom_.child_frame_id = msg->twist.header.frame_id;
 }
 
 //copy over the odometry information
@@ -86,10 +97,23 @@ void OdometryHelperRos::setOdomTopic(std::string odom_topic)
     if( odom_topic_ != "" )
     {
       ros::NodeHandle gn;
-      odom_sub_ = gn.subscribe<nav_msgs::Odometry>( odom_topic_, 1, boost::bind( &OdometryHelperRos::odomCallback, this, _1 ));
-    }
-    else
-    {
+
+      bool stubscribed_to_quadruped_state = false;
+      ros::master::V_TopicInfo topics;
+      ros::master::getTopics(topics);
+      for (size_t i = 0; i < topics.size(); i++) {
+        if (topics[i].name.compare(odom_topic_) == 0 && topics[i].datatype.compare("quadruped_msgs/QuadrupedState") == 0) {
+          odom_sub_ =
+              gn.subscribe<quadruped_msgs::QuadrupedState>(odom_topic_, 1, boost::bind(&OdometryHelperRos::qStateCallback, this, _1));
+          stubscribed_to_quadruped_state = true;
+          break;
+        }
+      }
+
+      if (!stubscribed_to_quadruped_state) {
+        odom_sub_ = gn.subscribe<nav_msgs::Odometry>(odom_topic_, 1, boost::bind(&OdometryHelperRos::odomCallback, this, _1));
+      }
+    } else {
       odom_sub_.shutdown();
     }
   }

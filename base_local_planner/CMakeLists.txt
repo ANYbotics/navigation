@@ -19,6 +19,7 @@ find_package(catkin REQUIRED
             std_msgs
             tf
             voxel_grid
+            quadruped_msgs
         )
 
 find_package(Boost REQUIRED
@@ -73,6 +74,7 @@ catkin_package(
         roscpp
         std_msgs
         tf
+        quadruped_msgs
 )
 
 #uncomment for profiling

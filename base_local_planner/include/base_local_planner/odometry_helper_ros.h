@@ -42,6 +42,7 @@
 #include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 #include <boost/thread.hpp>
+#include <quadruped_msgs/QuadrupedState.h>
 
 namespace base_local_planner {
 
@@ -60,6 +61,7 @@ public:
    * @param msg An Odometry message
    */
   void odomCallback(const nav_msgs::Odometry::ConstPtr& msg);
+  void qStateCallback(const quadruped_msgs::QuadrupedState::ConstPtr& msg);
 
   void getOdom(nav_msgs::Odometry& base_odom);
 
