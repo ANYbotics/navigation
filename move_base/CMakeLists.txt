@@ -21,6 +21,7 @@ find_package(catkin REQUIRED
         rotate_recovery
         std_srvs
         tf
+        any_msgs
 )
 find_package(Eigen3 REQUIRED)
 add_definitions(${EIGEN3_DEFINITIONS})
@@ -37,6 +38,7 @@ catkin_package(
         move_base_msgs
         nav_msgs
         roscpp
+        any_msgs
 )
 
 include_directories(
