@@ -51,7 +51,7 @@ namespace move_base {
     as_(NULL),
     planner_costmap_ros_(NULL), controller_costmap_ros_(NULL),
     bgp_loader_("nav_core", "nav_core::BaseGlobalPlanner"),
-    blp_loader_("nav_core", "nav_core::BaseLocalPlanner"), 
+    blp_loader_("nav_core", "nav_core::BaseLocalPlanner"),
     recovery_loader_("nav_core", "nav_core::RecoveryBehavior"),
     planner_plan_(NULL), latest_plan_(NULL), controller_plan_(NULL),
     runPlanner_(false), setup_(false), p_freq_change_(false), c_freq_change_(false), new_global_plan_(false) {
@@ -64,9 +64,8 @@ namespace move_base {
     recovery_trigger_ = PLANNING_R;
 
     //get some parameters that will be global to the move base node
-    std::string global_planner, local_planner;
-    private_nh.param("base_global_planner", global_planner, std::string("navfn/NavfnROS"));
-    private_nh.param("base_local_planner", local_planner, std::string("base_local_planner/TrajectoryPlannerROS"));
+    private_nh.param("base_global_planner", global_planner_name_, std::string("navfn/NavfnROS"));
+    private_nh.param("base_local_planner", local_planner_name_, std::string("base_local_planner/TrajectoryPlannerROS"));
     private_nh.param("global_costmap/robot_base_frame", robot_base_frame_, std::string("base_link"));
     private_nh.param("global_costmap/global_frame", global_frame_, std::string("/map"));
     private_nh.param("planner_frequency", planner_frequency_, 0.0);
@@ -116,10 +115,10 @@ namespace move_base {
 
     //initialize the global planner
     try {
-      planner_ = bgp_loader_.createInstance(global_planner);
-      planner_->initialize(bgp_loader_.getName(global_planner), planner_costmap_ros_);
+      planner_ = bgp_loader_.createInstance(global_planner_name_);
+      planner_->initialize(bgp_loader_.getName(global_planner_name_), planner_costmap_ros_);
     } catch (const pluginlib::PluginlibException& ex) {
-      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the containing library is built? Exception: %s", global_planner.c_str(), ex.what());
+      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the containing library is built? Exception: %s", global_planner_name_.c_str(), ex.what());
       exit(1);
     }
 
@@ -129,11 +128,11 @@ namespace move_base {
 
     //create a local planner
     try {
-      tc_ = blp_loader_.createInstance(local_planner);
-      ROS_INFO("Created local_planner %s", local_planner.c_str());
-      tc_->initialize(blp_loader_.getName(local_planner), &tf_, controller_costmap_ros_);
+      tc_ = blp_loader_.createInstance(local_planner_name_);
+      ROS_INFO("Created local_planner %s", local_planner_name_.c_str());
+      tc_->initialize(blp_loader_.getName(local_planner_name_), &tf_, controller_costmap_ros_);
     } catch (const pluginlib::PluginlibException& ex) {
-      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the containing library is built? Exception: %s", local_planner.c_str(), ex.what());
+      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the containing library is built? Exception: %s", local_planner_name_.c_str(), ex.what());
       exit(1);
     }
 
@@ -146,6 +145,12 @@ namespace move_base {
 
     //advertise a service for clearing the costmaps
     clear_costmaps_srv_ = private_nh.advertiseService("clear_costmaps", &MoveBase::clearCostmapsService, this);
+
+    //advertise a service for switching global planner
+    switch_global_planner_srv_ = private_nh.advertiseService("switch_global_planner", &MoveBase::switchGlobalPlannerService, this);
+
+    //advertise a service for switching local planner
+    switch_local_planner_srv_= private_nh.advertiseService("switch_local_planner", &MoveBase::switchLocalPlannerService, this);
 
     //if we shutdown our costmaps when we're deactivated... we'll do that now
     if(shutdown_costmaps_){
@@ -171,6 +176,78 @@ namespace move_base {
     dsrv_ = new dynamic_reconfigure::Server<move_base::MoveBaseConfig>(ros::NodeHandle("~"));
     dynamic_reconfigure::Server<move_base::MoveBaseConfig>::CallbackType cb = boost::bind(&MoveBase::reconfigureCB, this, _1, _2);
     dsrv_->setCallback(cb);
+  }
+
+  bool MoveBase::switchGlobalPlannerService(any_msgs::SetString::Request& req, any_msgs::SetString::Response& res) {
+    res.success = switchGlobalPlanner(req.data);
+    return true;
+  }
+
+  bool MoveBase::switchGlobalPlanner(const std::string& desired_global_planner_name) {
+
+    if(global_planner_name_ == desired_global_planner_name) {
+      ROS_INFO("Global planner %s is already running!", global_planner_name_.c_str());
+      return true;
+    }
+
+    boost::shared_ptr<nav_core::BaseGlobalPlanner> old_planner = planner_;
+    //initialize the global planner
+    ROS_INFO("Loading global planner %s", desired_global_planner_name.c_str());
+    try {
+      planner_ = bgp_loader_.createInstance(desired_global_planner_name);
+
+      // wait for the current planner to finish planning
+      boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
+
+      // Clean up before initializing the new planner
+      planner_plan_->clear();
+      latest_plan_->clear();
+      controller_plan_->clear();
+      resetState();
+      planner_->initialize(bgp_loader_.getName(desired_global_planner_name), planner_costmap_ros_);
+      global_planner_name_ = desired_global_planner_name;
+      lock.unlock();
+    } catch (const pluginlib::PluginlibException& ex) {
+      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the \
+                 containing library is built? Exception: %s", desired_global_planner_name.c_str(), ex.what());
+      planner_ = old_planner;
+      return false;
+    }
+
+    return true;
+  }
+
+  bool MoveBase::switchLocalPlannerService(any_msgs::SetString::Request& req, any_msgs::SetString::Response& res) {
+    res.success = switchLocalPlanner(req.data);
+    return true;
+  }
+
+  bool MoveBase::switchLocalPlanner(const std::string& desired_local_planner_name) {
+
+    if(local_planner_name_ == desired_local_planner_name) {
+      ROS_INFO("Local planner %s is already running!", local_planner_name_.c_str());
+      return true;
+    }
+
+    boost::shared_ptr<nav_core::BaseLocalPlanner> old_planner = tc_;
+    //create a local planner
+    try {
+      tc_ = blp_loader_.createInstance(desired_local_planner_name);
+      // Clean up before initializing the new planner
+      planner_plan_->clear();
+      latest_plan_->clear();
+      controller_plan_->clear();
+      resetState();
+      tc_->initialize(blp_loader_.getName(desired_local_planner_name), &tf_, controller_costmap_ros_);
+      local_planner_name_ = desired_local_planner_name;
+    } catch (const pluginlib::PluginlibException& ex) {
+      ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the \
+                 containing library is built? Exception: %s", desired_local_planner_name.c_str(), ex.what());
+      tc_ = old_planner;
+      return false;
+    }
+
+    return true;
   }
 
   void MoveBase::reconfigureCB(move_base::MoveBaseConfig &config, uint32_t level){
@@ -215,50 +292,6 @@ namespace move_base {
 
     oscillation_timeout_ = config.oscillation_timeout;
     oscillation_distance_ = config.oscillation_distance;
-    if(config.base_global_planner != last_config_.base_global_planner) {
-      boost::shared_ptr<nav_core::BaseGlobalPlanner> old_planner = planner_;
-      //initialize the global planner
-      ROS_INFO("Loading global planner %s", config.base_global_planner.c_str());
-      try {
-        planner_ = bgp_loader_.createInstance(config.base_global_planner);
-
-        // wait for the current planner to finish planning
-        boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
-
-        // Clean up before initializing the new planner
-        planner_plan_->clear();
-        latest_plan_->clear();
-        controller_plan_->clear();
-        resetState();
-        planner_->initialize(bgp_loader_.getName(config.base_global_planner), planner_costmap_ros_);
-
-        lock.unlock();
-      } catch (const pluginlib::PluginlibException& ex) {
-        ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the \
-                   containing library is built? Exception: %s", config.base_global_planner.c_str(), ex.what());
-        planner_ = old_planner;
-        config.base_global_planner = last_config_.base_global_planner;
-      }
-    }
-
-    if(config.base_local_planner != last_config_.base_local_planner){
-      boost::shared_ptr<nav_core::BaseLocalPlanner> old_planner = tc_;
-      //create a local planner
-      try {
-        tc_ = blp_loader_.createInstance(config.base_local_planner);
-        // Clean up before initializing the new planner
-        planner_plan_->clear();
-        latest_plan_->clear();
-        controller_plan_->clear();
-        resetState();
-        tc_->initialize(blp_loader_.getName(config.base_local_planner), &tf_, controller_costmap_ros_);
-      } catch (const pluginlib::PluginlibException& ex) {
-        ROS_FATAL("Failed to create the %s planner, are you sure it is properly registered and that the \
-                   containing library is built? Exception: %s", config.base_local_planner.c_str(), ex.what());
-        tc_ = old_planner;
-        config.base_local_planner = last_config_.base_local_planner;
-      }
-    }
 
     last_config_ = config;
   }
@@ -371,7 +404,7 @@ namespace move_base {
     //first try to make a plan to the exact desired goal
     std::vector<geometry_msgs::PoseStamped> global_plan;
     if(!planner_->makePlan(start, req.goal, global_plan) || global_plan.empty()){
-      ROS_DEBUG_NAMED("move_base","Failed to find a plan to exact goal of (%.2f, %.2f), searching for a feasible goal within tolerance", 
+      ROS_DEBUG_NAMED("move_base","Failed to find a plan to exact goal of (%.2f, %.2f), searching for a feasible goal within tolerance",
           req.goal.pose.position.x, req.goal.pose.position.y);
 
       //search outwards for a feasible goal within the specified tolerance
@@ -816,7 +849,7 @@ namespace move_base {
       last_oscillation_reset_ = ros::Time::now();
       oscillation_pose_ = current_position;
 
-      //if our last recovery was caused by oscillation, we want to reset the recovery index 
+      //if our last recovery was caused by oscillation, we want to reset the recovery index
       if(recovery_trigger_ == OSCILLATION_R)
         recovery_index_ = 0;
     }
@@ -901,10 +934,10 @@ namespace move_base {
           state_ = CLEARING;
           recovery_trigger_ = OSCILLATION_R;
         }
-        
+
         {
          boost::unique_lock<costmap_2d::Costmap2D::mutex_t> lock(*(controller_costmap_ros_->getCostmap()->getMutex()));
-        
+
         if(tc_->computeVelocityCommands(cmd_vel)){
           ROS_DEBUG_NAMED( "move_base", "Got a valid command from the local planner: %.3lf, %.3lf, %.3lf",
                            cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z );
@@ -1022,7 +1055,7 @@ namespace move_base {
                     std::string name_i = behavior_list[i]["name"];
                     std::string name_j = behavior_list[j]["name"];
                     if(name_i == name_j){
-                      ROS_ERROR("A recovery behavior with the name %s already exists, this is not allowed. Using the default recovery behaviors instead.", 
+                      ROS_ERROR("A recovery behavior with the name %s already exists, this is not allowed. Using the default recovery behaviors instead.",
                           name_i.c_str());
                       return false;
                     }
@@ -1078,7 +1111,7 @@ namespace move_base {
         }
       }
       else{
-        ROS_ERROR("The recovery behavior specification must be a list, but is of XmlRpcType %d. We'll use the default recovery behaviors instead.", 
+        ROS_ERROR("The recovery behavior specification must be a list, but is of XmlRpcType %d. We'll use the default recovery behaviors instead.",
             behavior_list.getType());
         return false;
       }
