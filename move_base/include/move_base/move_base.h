@@ -52,6 +52,7 @@
 #include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
 #include <nav_msgs/GetPlan.h>
+#include <any_msgs/SetString.h>
 
 #include <pluginlib/class_loader.hpp>
 #include <std_srvs/Empty.h>
@@ -105,7 +106,7 @@ namespace move_base {
     private:
       /**
        * @brief  A service call that clears the costmaps of obstacles
-       * @param req The service request 
+       * @param req The service request
        * @param resp The service response
        * @return True if the service call succeeds, false otherwise
        */
@@ -128,8 +129,38 @@ namespace move_base {
       bool makePlan(const geometry_msgs::PoseStamped& goal, std::vector<geometry_msgs::PoseStamped>& plan);
 
       /**
+       * @brief  Service to switch the global planner
+       * @param  req  Name of the global planner to switch to
+       * @param  res  Notifies success
+       * @return True if the service call succeeds, false otherwise
+       */
+      bool switchGlobalPlannerService(any_msgs::SetString::Request& req, any_msgs::SetString::Response& res);
+
+      /**
+       * @brief  Switch the global planner
+       * @param  local_planner_name  Name of the global planner to switch to
+       * @return True if the planner was switched
+       */
+      bool switchGlobalPlanner(const std::string& global_planner_name);
+
+      /**
+       * @brief  Service to switch the local planner
+       * @param  req  Name of the local planner to switch to
+       * @param  res  Notifies success
+       * @return True if the service call succeeds, false otherwise
+       */
+      bool switchLocalPlannerService(any_msgs::SetString::Request& req, any_msgs::SetString::Response& res);
+
+      /**
+       * @brief  Switch the local planner
+       * @param  local_planner_name  Name of the local planner to switch to
+       * @return True if the planner was switched
+       */
+      bool switchLocalPlanner(const std::string& local_planner_name);
+
+      /**
        * @brief  Load the recovery behaviors for the navigation stack from the parameter server
-       * @param node The ros::NodeHandle to be used for loading parameters 
+       * @param node The ros::NodeHandle to be used for loading parameters
        * @return True if the recovery behaviors were loaded successfully, false otherwise
        */
       bool loadRecoveryBehaviors(ros::NodeHandle node);
@@ -196,7 +227,7 @@ namespace move_base {
       double conservative_reset_dist_, clearing_radius_;
       ros::Publisher current_goal_pub_, vel_pub_, vel_stamped_pub_, action_goal_pub_;
       ros::Subscriber goal_sub_;
-      ros::ServiceServer make_plan_srv_, clear_costmaps_srv_;
+      ros::ServiceServer make_plan_srv_, clear_costmaps_srv_, switch_global_planner_srv_, switch_local_planner_srv_;
       bool shutdown_costmaps_, clearing_rotation_allowed_, recovery_behavior_enabled_;
       double oscillation_timeout_, oscillation_distance_;
 
@@ -224,14 +255,16 @@ namespace move_base {
 
       boost::recursive_mutex configuration_mutex_;
       dynamic_reconfigure::Server<move_base::MoveBaseConfig> *dsrv_;
-      
+
       void reconfigureCB(move_base::MoveBaseConfig &config, uint32_t level);
 
       move_base::MoveBaseConfig last_config_;
       move_base::MoveBaseConfig default_config_;
       bool setup_, p_freq_change_, c_freq_change_;
       bool new_global_plan_;
+      std::string global_planner_name_;
+      std::string local_planner_name_;
+
   };
 };
 #endif
-
