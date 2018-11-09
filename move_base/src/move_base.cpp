@@ -559,7 +559,7 @@ namespace move_base {
 
     if(fabs(dot - 1) > 1e-3){
       ROS_ERROR("Quaternion is invalid... for navigation the z-axis of the quaternion must be close to vertical.");
-      return false;
+    //  return false;
     }
 
     return true;
