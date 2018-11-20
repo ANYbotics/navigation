@@ -550,6 +550,7 @@ namespace move_base {
       return false;
     }
 
+/*
     //next, we'll normalize the quaternion and check that it transforms the vertical vector correctly
     tf_q.normalize();
 
@@ -561,6 +562,7 @@ namespace move_base {
       ROS_ERROR("Quaternion is invalid... for navigation the z-axis of the quaternion must be close to vertical.");
       return false;
     }
+*/
 
     return true;
   }
