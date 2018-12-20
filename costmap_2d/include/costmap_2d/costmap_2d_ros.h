@@ -219,6 +219,7 @@ protected:
   tf::TransformListener& tf_;  ///< @brief Used for transforming point clouds
   std::string global_frame_;  ///< @brief The global frame for the costmap
   std::string robot_base_frame_;  ///< @brief The frame_id of the robot base
+  std::string robot_ground_frame_;  ///< @brief The frame_id of the ground plane, only for visualization
   double transform_tolerance_;  ///< timeout before transform errors
 
 private:
