@@ -103,14 +103,14 @@ Costmap2DROS::Costmap2DROS(std::string name, tf::TransformListener& tf) :
   while (ros::ok()
       && (!tf_.waitForTransform(global_frame_, robot_base_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01),
                                &tf_error)
-      || !tf_.waitForTransform(robot_ground_frame_, robot_base_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01),
+      || !tf_.waitForTransform(global_frame_, robot_ground_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01),
                                &tf_error)))
   {
     ros::spinOnce();
     if (last_error + ros::Duration(5.0) < ros::Time::now())
     {
       ROS_WARN("Timed out waiting for transform from %s or %s to %s to become available before running costmap, tf error: %s",
-               robot_base_frame_.c_str(), global_frame_.c_str(), robot_ground_frame_.c_str(), tf_error.c_str());
+               robot_base_frame_.c_str(), robot_ground_frame_.c_str(), global_frame_.c_str(), tf_error.c_str());
       last_error = ros::Time::now();
     }
     // The error string will accumulate and errors will typically be the same, so the last
