@@ -82,12 +82,12 @@ Costmap2DPublisher::~Costmap2DPublisher()
 
 void Costmap2DPublisher::onNewSubscription(const ros::SingleSubscriberPublisher& pub)
 {
-  prepareGrid();
+  prepareGrid(0.0);
   pub.publish(grid_);
 }
 
 // prepare grid_ message for publication.
-void Costmap2DPublisher::prepareGrid()
+void Costmap2DPublisher::prepareGrid(double ground_height)
 {
   boost::unique_lock<Costmap2D::mutex_t> lock(*(costmap_->getMutex()));
   double resolution = costmap_->getResolution();
@@ -103,7 +103,7 @@ void Costmap2DPublisher::prepareGrid()
   costmap_->mapToWorld(0, 0, wx, wy);
   grid_.info.origin.position.x = wx - resolution / 2;
   grid_.info.origin.position.y = wy - resolution / 2;
-  grid_.info.origin.position.z = 0.0;
+  grid_.info.origin.position.z = ground_height;
   grid_.info.origin.orientation.w = 1.0;
   saved_origin_x_ = costmap_->getOriginX();
   saved_origin_y_ = costmap_->getOriginY();
@@ -117,7 +117,7 @@ void Costmap2DPublisher::prepareGrid()
   }
 }
 
-void Costmap2DPublisher::publishCostmap()
+void Costmap2DPublisher::publishCostmap(double ground_height)
 {
   if (costmap_pub_.getNumSubscribers() == 0)
   {
@@ -133,7 +133,7 @@ void Costmap2DPublisher::publishCostmap()
       saved_origin_x_ != costmap_->getOriginX() ||
       saved_origin_y_ != costmap_->getOriginY())
   {
-    prepareGrid();
+    prepareGrid(ground_height);
     costmap_pub_.publish(grid_);
   }
   else if (x0_ < xn_)

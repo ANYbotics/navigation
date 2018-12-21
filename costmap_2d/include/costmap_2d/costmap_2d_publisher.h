@@ -75,7 +75,7 @@ public:
   /**
    * @brief  Publishes the visualization data over ROS
    */
-  void publishCostmap();
+  void publishCostmap(double ground_height = 0.0);
 
   /**
    * @brief Check if the publisher is active
@@ -88,7 +88,7 @@ public:
 
 private:
   /** @brief Prepare grid_ message for publication. */
-  void prepareGrid();
+  void prepareGrid(double ground_height);
 
   /** @brief Publish the latest full costmap to the new subscriber. */
   void onNewSubscription(const ros::SingleSubscriberPublisher& pub);
