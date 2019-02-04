@@ -93,10 +93,8 @@ Costmap2DROS::Costmap2DROS(const std::string& name, tf2_ros::Buffer& tf) :
   std::string tf_error;
   // we need to make sure that the transform between the robot base frame and the global frame is available
   while (ros::ok()
-      && (!tf_.canTransform(global_frame_, robot_base_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01),
-                               &tf_error)
-      || !tf_.canTransform(global_frame_, robot_ground_frame_, ros::Time(), ros::Duration(0.1), ros::Duration(0.01),
-                               &tf_error)))
+      && (!tf_.canTransform(global_frame_, robot_base_frame_, ros::Time(), ros::Duration(0.1), &tf_error)
+      || !tf_.canTransform(global_frame_, robot_ground_frame_, ros::Time(), ros::Duration(0.1), &tf_error)))
   {
     ros::spinOnce();
     if (last_error + ros::Duration(5.0) < ros::Time::now())
@@ -415,24 +413,14 @@ void Costmap2DROS::mapUpdateLoop(double frequency)
       ros::Time now = ros::Time::now();
       if (last_publish_ + publish_cycle < now)
       {
-        tf::StampedTransform ground_in_global;
+        geometry_msgs::TransformStamped ground_in_global;
         try
         {
-          tf_.lookupTransform(global_frame_, robot_ground_frame_, ros::Time(0), ground_in_global);
+          ground_in_global = tf_.lookupTransform(global_frame_, robot_ground_frame_, ros::Time());
+        } catch (tf2::TransformException& ex) {
+          ROS_ERROR_THROTTLE(1.0, "TF2 Transform Error: %s\n", ex.what());
         }
-        catch (tf::LookupException& ex)
-        {
-          ROS_ERROR_THROTTLE(1.0, "No Transform available Error looking up ground frame: %s\n", ex.what());
-        }
-        catch (tf::ConnectivityException& ex)
-        {
-          ROS_ERROR_THROTTLE(1.0, "Connectivity Error looking up ground frame: %s\n", ex.what());
-        }
-        catch (tf::ExtrapolationException& ex)
-        {
-          ROS_ERROR_THROTTLE(1.0, "Extrapolation Error looking up ground frame: %s\n", ex.what());
-        }
-        publisher_->publishCostmap(ground_in_global.getOrigin().getZ());
+        publisher_->publishCostmap(ground_in_global.transform.translation.z);
         last_publish_ = now;
       }
     }
