@@ -85,7 +85,7 @@ public:
     return active_;
   }
 
-private:
+protected:
   /** @brief Prepare grid_ message for publication. */
   void prepareGrid(double ground_height);
 
