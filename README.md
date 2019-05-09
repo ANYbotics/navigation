@@ -1,4 +1,4 @@
-> NOTE: This fork is only for testing purpose for a short term. Please use original repository [`ros-planning/navigation`](http://github.com/ros-planning/navigation) if you are building it from source.
+> NOTE: This fork was only for testing purpose for a short term. It is not required anymore and thus the repository is now archived. Please use original repository [`ros-planning/navigation`](http://github.com/ros-planning/navigation) if you are building it from source.
 
 ROS Navigation Stack
 ====================
